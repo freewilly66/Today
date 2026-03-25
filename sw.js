@@ -1,5 +1,5 @@
 const CACHE = 'daylog-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const ASSETS = ['/Today/', '/Today/index.html', '/Today/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
