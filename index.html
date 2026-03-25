@@ -483,6 +483,60 @@ select.cat-select:focus { border-color: var(--accent); }
 .mt-2 { margin-top: 8px; }
 .mt-3 { margin-top: 12px; }
 
+/* Routine Checklist */
+.routine-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.routine-section-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--text3); letter-spacing: .05em;
+  text-transform: uppercase; margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.routine-rate { font-size: 13px; color: var(--accent); font-weight: 700; letter-spacing: 0; text-transform: none; }
+.routine-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.routine-item:last-child { border-bottom: none; padding-bottom: 0; }
+.routine-item:first-child { padding-top: 0; }
+.routine-check {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .2s;
+  font-size: 13px;
+}
+.routine-item.done .routine-check {
+  background: var(--routine); border-color: var(--routine); color: white;
+}
+.routine-item.done .routine-name { text-decoration: line-through; color: var(--text3); }
+.routine-name { font-size: 15px; font-weight: 500; color: var(--text1); }
+.routine-period {
+  font-size: 11px; color: var(--text3);
+  margin-left: auto; flex-shrink: 0;
+}
+
+/* Routine settings rows */
+.routine-settings-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.routine-settings-row:last-child { border-bottom: none; }
+.routine-drag { color: var(--text3); cursor: grab; font-size: 16px; }
+.routine-settings-name { font-size: 15px; flex: 1; }
+.routine-settings-period { font-size: 12px; color: var(--text3); }
+.routine-toggle-del {
+  display: flex; align-items: center; gap: 8px;
+}
+
 /* Swipe hint */
 .swipe-hint { font-size: 12px; color: var(--text3); text-align: center; margin-top: 8px; }
 </style>
@@ -505,6 +559,9 @@ select.cat-select:focus { border-color: var(--accent); }
     <!-- TIMELINE PAGE -->
     <div class="page active" id="pageTimeline">
       <div class="page-content">
+        <!-- 루틴 체크리스트 -->
+        <div id="routineChecklist" style="margin-bottom:14px"></div>
+
         <div class="streak-banner" id="streakBanner">
           <div>
             <div class="streak-num" id="streakNum">0</div>
@@ -558,6 +615,13 @@ select.cat-select:focus { border-color: var(--accent); }
     <!-- SETTINGS PAGE -->
     <div class="page" id="pageSettings">
       <div class="page-content">
+        <!-- Routines -->
+        <div class="settings-section">
+          <div class="section-title">루틴 관리</div>
+          <div class="settings-card" id="routineSettingsList"></div>
+          <button class="submit-btn" style="margin-top:10px;background:var(--accent-light);color:var(--accent);font-size:14px;padding:12px" onclick="App.openAddRoutineModal()">＋ 루틴 추가</button>
+        </div>
+
         <!-- API Key -->
         <div class="settings-section">
           <div class="section-title">Claude AI 설정</div>
@@ -755,6 +819,28 @@ select.cat-select:focus { border-color: var(--accent); }
   </div>
 </div>
 
+<!-- ROUTINE ADD MODAL -->
+<div class="modal-overlay" id="routineModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title">루틴 추가</div>
+      <button class="modal-close" onclick="App.closeModal('routineModal')">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px">루틴 이름을 입력하고 시간대를 선택하세요.</div>
+    <input class="input-area" id="routineNameInput" placeholder="예: 독서 30분, 명상, 비타민 먹기..." style="min-height:auto;padding:12px 14px;font-size:16px" onkeydown="if(event.key==='Enter')App.saveRoutine()">
+    <div style="margin-top:12px">
+      <div class="input-label" style="margin-bottom:8px">시간대</div>
+      <div style="display:flex;gap:8px">
+        <button class="cat-opt" data-period="morning" onclick="App.selectPeriod(this)" style="flex:1;text-align:center">🌅 아침</button>
+        <button class="cat-opt" data-period="evening" onclick="App.selectPeriod(this)" style="flex:1;text-align:center">🌙 저녁</button>
+        <button class="cat-opt selected" data-period="anytime" onclick="App.selectPeriod(this)" style="flex:1;text-align:center">⏰ 언제든</button>
+      </div>
+    </div>
+    <button class="submit-btn" onclick="App.saveRoutine()">추가</button>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -797,7 +883,16 @@ const DEFAULT_KEYWORDS = {
          '청소','빨래','요리','드라이브','콘서트','전시','게임']
 };
 
-// ── Storage 헬퍼 ──────────────────────────────
+// 기본 루틴 (코드에 하드코딩)
+const DEFAULT_ROUTINES = [
+  { id: 'rt_default_001', name: '아침운동', period: 'morning',  active: true, isDefault: true },
+  { id: 'rt_default_002', name: '듀오링고', period: 'anytime',  active: true, isDefault: true },
+  { id: 'rt_default_003', name: '영어듣기', period: 'anytime',  active: true, isDefault: true },
+  { id: 'rt_default_004', name: '저녁운동', period: 'evening',  active: true, isDefault: true },
+];
+const PERIOD_LABEL = { morning: '🌅 아침', evening: '🌙 저녁', anytime: '⏰ 언제든' };
+
+
 const S = {
   get: k => { try { const v = localStorage.getItem(PREF+k); return v ? JSON.parse(v) : null; } catch { return null; } },
   set: (k, v) => { try { localStorage.setItem(PREF+k, JSON.stringify(v)); } catch(e) { console.error('Storage full', e); } },
@@ -873,7 +968,105 @@ function getKeywords() {
   };
 }
 
-// ── 자동 분류 ──────────────────────────────────
+// ── 루틴 CRUD ────────────────────────────────
+function loadRoutines() {
+  const saved = S.get('routines') || {};
+  const customItems = saved.items || [];
+  const completions = saved.completions || {};
+  const overrides = saved.overrides || {};
+  // 기본 루틴에 오버라이드 적용
+  const defaults = DEFAULT_ROUTINES.map(r => ({
+    ...r,
+    active: overrides[r.id] !== undefined ? overrides[r.id].active : r.active
+  }));
+  const allItems = [...defaults, ...customItems];
+  return { items: allItems, completions };
+}
+function saveRoutineItems(items) {
+  // 커스텀 루틴만 저장 (기본 루틴은 코드에)
+  const saved = S.get('routines') || {};
+  saved.items = items.filter(r => !r.isDefault);
+  S.set('routines', saved);
+}
+function saveRoutineCompletions(completions) {
+  const saved = S.get('routines') || {};
+  saved.completions = completions;
+  // 30일 컷오프
+  const cutoff = new Date(parseDate(localDate()).getTime() - 30 * 86400000);
+  const cutoffStr = localDate(cutoff);
+  for (const d of Object.keys(saved.completions)) {
+    if (d < cutoffStr) delete saved.completions[d];
+  }
+  S.set('routines', saved);
+}
+function getTodayCompletions(date) {
+  const r = loadRoutines();
+  return r.completions[date] || [];
+}
+function toggleRoutineComplete(routineId, date) {
+  const saved = S.get('routines') || { items: [], completions: {} };
+  if (!saved.completions) saved.completions = {};
+  if (!saved.completions[date]) saved.completions[date] = [];
+  const idx = saved.completions[date].indexOf(routineId);
+  let isDone;
+  if (idx >= 0) {
+    // 체크 해제 → 타임라인 자동 기록도 삭제
+    saved.completions[date].splice(idx, 1);
+    isDone = false;
+    // 타임라인에서 해당 루틴 자동 기록 삭제
+    removeRoutineEntry(routineId, date);
+  } else {
+    // 체크 → 타임라인 자동 기록 추가
+    saved.completions[date].push(routineId);
+    isDone = true;
+    addRoutineEntry(routineId, date);
+  }
+  saveRoutineCompletions(saved.completions);
+  return isDone;
+}
+function addRoutineEntry(routineId, date) {
+  const { items } = loadRoutines();
+  const routine = items.find(r => r.id === routineId);
+  if (!routine) return;
+  const key = entriesKey(date);
+  const arr = S.get(key) || [];
+  // 중복 방지
+  if (arr.find(e => e.routineId === routineId && e.date === date)) return;
+  const entry = {
+    id: genId(),
+    date, time: localTime(),
+    text: routine.name,
+    category: '루틴', categorySource: 'auto',
+    tags: [], inputMethod: 'routine',
+    weather: null, photos: [],
+    routineId,
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+  arr.push(entry);
+  arr.sort((a, b) => a.time.localeCompare(b.time));
+  S.set(key, arr);
+}
+function removeRoutineEntry(routineId, date) {
+  const key = entriesKey(date);
+  const arr = (S.get(key) || []).filter(e => !(e.routineId === routineId && e.date === date));
+  S.set(key, arr);
+}
+function getCompletionRate(days = 30) {
+  const { items, completions } = loadRoutines();
+  const activeItems = items.filter(r => r.active);
+  if (!activeItems.length) return 0;
+  let total = 0, done = 0;
+  for (let i = 0; i < days; i++) {
+    const d = new Date(parseDate(localDate()).getTime() - i * 86400000);
+    const ds = localDate(d);
+    const dayDone = (completions[ds] || []).filter(id => activeItems.find(r => r.id === id)).length;
+    done += dayDone;
+    total += activeItems.length;
+  }
+  return total ? Math.round(done / total * 100) : 0;
+}
+
+
 function classifyText(text) {
   if (!text.trim()) return '기타';
   const lower = text.toLowerCase();
@@ -1085,7 +1278,35 @@ function renderStreak() {
   document.getElementById('freezeLabel').textContent = `Freeze ${s.freezeTokens}개 보유`;
 }
 
-function renderCalendar() {
+function renderRoutineChecklist() {
+  const el = document.getElementById('routineChecklist');
+  if (!el) return;
+  const { items } = loadRoutines();
+  const activeItems = items.filter(r => r.active);
+  if (!activeItems.length) { el.innerHTML = ''; return; }
+  const today = State.currentDate;
+  const isToday = today === localDate();
+  const doneIds = getTodayCompletions(today);
+  const rate = getCompletionRate(30);
+  const doneCount = activeItems.filter(r => doneIds.includes(r.id)).length;
+  el.innerHTML = `
+    <div class="routine-section">
+      <div class="routine-section-title">
+        <span>오늘의 루틴 ${doneCount}/${activeItems.length}</span>
+        <span class="routine-rate">${rate}% 완료율</span>
+      </div>
+      ${activeItems.map(r => {
+        const done = doneIds.includes(r.id);
+        return `<div class="routine-item${done?' done':''}" onclick="App.checkRoutine('${r.id}','${today}')">
+          <div class="routine-check">${done ? '✓' : ''}</div>
+          <span class="routine-name">${escapeHtml(r.name)}</span>
+          <span class="routine-period">${PERIOD_LABEL[r.period] || ''}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+
   const y = State.calYear, m = State.calMonth;
   document.getElementById('calTitle').textContent = `${y}년 ${MONTHS[m]}`;
   const firstDay = new Date(y, m, 1).getDay();
@@ -1160,7 +1381,32 @@ function renderSettings() {
   renderKeywords();
 }
 
-// ── 앱 메인 ─────────────────────────────────
+function renderRoutineSettings() {
+  const el = document.getElementById('routineSettingsList');
+  if (!el) return;
+  const { items } = loadRoutines();
+  if (!items.length) {
+    el.innerHTML = '<div style="padding:14px 16px;font-size:14px;color:var(--text3)">루틴이 없어요. 아래에서 추가해주세요.</div>';
+    return;
+  }
+  el.innerHTML = items.map(r => `
+    <div class="routine-settings-row">
+      <span class="routine-drag">⠿</span>
+      <div style="flex:1">
+        <div class="routine-settings-name">${escapeHtml(r.name)}</div>
+        <div class="routine-settings-period">${PERIOD_LABEL[r.period] || ''}</div>
+      </div>
+      <div class="routine-toggle-del">
+        <label class="toggle" title="활성/비활성">
+          <input type="checkbox" ${r.active ? 'checked' : ''} onchange="App.toggleRoutineActive('${r.id}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        ${!r.isDefault ? `<button class="action-btn danger" onclick="App.deleteRoutine('${r.id}')" title="삭제">🗑</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+
 const App = {
   // 탭 전환
   switchTab(tab) {
@@ -1169,9 +1415,9 @@ const App = {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById(`page${tab.charAt(0).toUpperCase()+tab.slice(1)}`).classList.add('active');
     document.getElementById(`nav${tab.charAt(0).toUpperCase()+tab.slice(1)}`).classList.add('active');
-    if (tab === 'timeline') { renderTimeline(); renderStreak(); }
+    if (tab === 'timeline') { renderTimeline(); renderStreak(); renderRoutineChecklist(); }
     if (tab === 'calendar') { renderCalendar(); renderCalDayEntries(State.currentDate); }
-    if (tab === 'settings') renderSettings();
+    if (tab === 'settings') { renderSettings(); renderRoutineSettings(); }
   },
 
   // 날짜 이동
@@ -1476,8 +1722,81 @@ const App = {
     renderTimeline(); renderStreak(); renderSettings();
   },
 
-  // Toast
-  toast(msg, duration = 2500) {
+  // ── 루틴 ─────────────────────────────────
+  checkRoutine(routineId, date) {
+    if (date !== localDate()) { this.toast('오늘 날짜만 체크할 수 있어요'); return; }
+    const isDone = toggleRoutineComplete(routineId, date);
+    updateStreak(date);
+    renderRoutineChecklist();
+    renderTimeline();
+    renderStreak();
+    this.toast(isDone ? '✅ 완료!' : '체크 해제됨');
+  },
+
+  openAddRoutineModal() {
+    document.getElementById('routineNameInput').value = '';
+    document.querySelectorAll('[data-period]').forEach(b => {
+      b.classList.toggle('selected', b.dataset.period === 'anytime');
+    });
+    this.openModal('routineModal');
+    setTimeout(() => document.getElementById('routineNameInput').focus(), 400);
+  },
+
+  selectPeriod(btn) {
+    document.querySelectorAll('[data-period]').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  },
+
+  saveRoutine() {
+    const name = document.getElementById('routineNameInput').value.trim();
+    if (!name) { this.toast('루틴 이름을 입력해주세요'); return; }
+    const periodBtn = document.querySelector('[data-period].selected');
+    const period = periodBtn ? periodBtn.dataset.period : 'anytime';
+    const saved = S.get('routines') || { items: [], completions: {} };
+    if (!saved.items) saved.items = [];
+    // 중복 이름 체크
+    const { items } = loadRoutines();
+    if (items.find(r => r.name === name)) {
+      this.toast('같은 이름의 루틴이 이미 있어요'); return;
+    }
+    saved.items.push({
+      id: `rt_custom_${Date.now()}`,
+      name, period, active: true, isDefault: false
+    });
+    S.set('routines', saved);
+    this.closeModal('routineModal');
+    this.toast(`"${name}" 루틴 추가됨 ✓`);
+    renderRoutineSettings();
+    renderRoutineChecklist();
+  },
+
+  toggleRoutineActive(routineId, active) {
+    const saved = S.get('routines') || { items: [], completions: {} };
+    // 기본 루틴 비활성화: 별도 overrides 저장
+    if (!saved.overrides) saved.overrides = {};
+    saved.overrides[routineId] = { active };
+    // 커스텀 루틴은 items에서 직접 수정
+    if (saved.items) {
+      const idx = saved.items.findIndex(r => r.id === routineId);
+      if (idx >= 0) saved.items[idx].active = active;
+    }
+    S.set('routines', saved);
+    renderRoutineSettings();
+    renderRoutineChecklist();
+    this.toast(active ? '루틴 활성화됨' : '루틴 비활성화됨');
+  },
+
+  deleteRoutine(routineId) {
+    if (!confirm('이 루틴을 삭제할까요?')) return;
+    const saved = S.get('routines') || { items: [] };
+    saved.items = (saved.items || []).filter(r => r.id !== routineId);
+    S.set('routines', saved);
+    renderRoutineSettings();
+    renderRoutineChecklist();
+    this.toast('루틴 삭제됨');
+  },
+
+
     const el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
@@ -1511,6 +1830,7 @@ document.getElementById('weatherBtn').onclick = async () => {
   checkAutoBackupTrigger();
   renderTimeline();
   renderStreak();
+  renderRoutineChecklist();
   // 달력 초기 월 설정
   const today = new Date();
   State.calYear = today.getFullYear();
