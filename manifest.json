@@ -1,0 +1,23 @@
+{
+  "name": "DayLog",
+  "short_name": "DayLog",
+  "description": "하루 일과 기록 앱",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#2D6A4F",
+  "orientation": "portrait",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%232D6A4F'/><text x='96' y='130' font-size='100' text-anchor='middle' fill='white'>📋</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%232D6A4F'/><text x='256' y='340' font-size='260' text-anchor='middle' fill='white'>📋</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
