@@ -2,7 +2,7 @@
   "name": "DayLog",
   "short_name": "DayLog",
   "description": "하루 일과 기록 앱",
-  "start_url": "/Today/",
+  "start_url": "/Today/index.html",
   "scope": "/Today/",
   "display": "standalone",
   "background_color": "#FAFAF8",
