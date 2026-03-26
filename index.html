@@ -312,8 +312,32 @@ body::before {
 .date-nav-btn:active { background: var(--bg3); transform: scale(0.92); }
 .date-nav-center { text-align: center; }
 .date-display { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
-.date-dow { font-size: 12px; color: var(--text3); margin-top: 1px; }
-#dateNoticeTags { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-top: 7px; }
+.date-sub { font-size: 12px; color: #9C27B0; font-weight: 600; margin-top: 3px; min-height: 0; }
+
+/* ── 최상단 기념일 배너 ─────────────────────── */
+#topAnniBanner {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  margin-bottom: 12px;
+}
+#topAnniBanner:empty { display: none; }
+.top-anni-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: 22px;
+  font-size: 13px; font-weight: 700;
+  background: linear-gradient(135deg, rgba(156,39,176,0.13), rgba(233,30,99,0.09));
+  border: 1.5px solid rgba(156,39,176,0.30);
+  color: #7B1FA2;
+  box-shadow: 0 2px 10px rgba(156,39,176,0.12);
+}
+.top-anni-tag.tag-holiday {
+  background: linear-gradient(135deg, rgba(229,57,53,0.12), rgba(255,87,34,0.08));
+  border-color: rgba(229,57,53,0.30); color: #C62828;
+  box-shadow: 0 2px 10px rgba(229,57,53,0.10);
+}
+@media (prefers-color-scheme: dark) {
+  .top-anni-tag { background: rgba(156,39,176,0.20); border-color: rgba(156,39,176,0.38); color: #CE93D8; }
+  .top-anni-tag.tag-holiday { background: rgba(229,57,53,0.20); border-color: rgba(229,57,53,0.38); color: #EF9A9A; }
+}
 .notice-tag {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 4px 10px; border-radius: 20px;
@@ -629,14 +653,16 @@ select.cat-select:focus { border-color: var(--accent); }
   display: flex; align-items: center; justify-content: space-between;
 }
 .routine-rate { font-size: 13px; color: var(--accent); font-weight: 700; letter-spacing: 0; text-transform: none; }
-.routine-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer; transition: opacity .15s;
+.routine-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
 }
-.routine-item:last-child { border-bottom: none; padding-bottom: 0; }
-.routine-item:first-child { padding-top: 0; }
+.routine-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 12px;
+  background: var(--bg2); border: 1px solid var(--border);
+  cursor: pointer; transition: background .15s;
+}
+.routine-item.done { background: rgba(5,150,105,0.08); border-color: rgba(5,150,105,0.22); }
 .routine-check {
   width: 26px; height: 26px; border-radius: 50%;
   border: 2px solid var(--border);
@@ -803,6 +829,9 @@ select.cat-select:focus { border-color: var(--accent); }
     <!-- TIMELINE PAGE -->
     <div class="page active" id="pageTimeline">
       <div class="page-content">
+        <!-- 최상단 기념일/공휴일 배너 -->
+        <div id="topAnniBanner"></div>
+
         <!-- 루틴 체크리스트 -->
         <div id="routineChecklist" style="margin-bottom:14px"></div>
 
@@ -821,8 +850,7 @@ select.cat-select:focus { border-color: var(--accent); }
           <button class="date-nav-btn" onclick="App.prevDay()">←</button>
           <div class="date-nav-center">
             <div class="date-display" id="dateDisplay"></div>
-            <div class="date-dow" id="dateDow"></div>
-            <div id="dateNoticeTags"></div>
+            <div class="date-sub" id="dateSub"></div>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             <button class="today-btn" onclick="App.goToday()">오늘</button>
@@ -830,7 +858,6 @@ select.cat-select:focus { border-color: var(--accent); }
           </div>
         </div>
 
-        <div id="dateNotice"></div>
         <div class="filter-bar" id="filterBar">
           <button class="filter-btn active" data-filter="전체" onclick="App.setFilter(this)">전체</button>
           <button class="filter-btn" data-filter="업무" onclick="App.setFilter(this)">💼 업무</button>
@@ -1701,32 +1728,40 @@ function aiSummaryCardHTML(text, date) {
 // ── 렌더링 ────────────────────────────────────
 function renderTimeline() {
   const entries = getEntries(State.currentDate);
-  const filtered = State.filter === '전체' ? entries : entries.filter(e => e.category === State.filter);
+  // 전체 필터: 루틴 자동완료 항목 숨김 (체크리스트에서 이미 확인 가능)
+  const filtered = State.filter === '전체'
+    ? entries.filter(e => e.inputMethod !== 'routine')
+    : entries.filter(e => e.category === State.filter);
   const el = document.getElementById('timeline');
-  document.getElementById('dateDisplay').textContent = formatDate(State.currentDate);
-  document.getElementById('dateDow').textContent = formatDateFull(State.currentDate);
-  const isToday = State.currentDate === localDate();
-  document.getElementById('headerTitle').textContent = isToday ? '오늘' : formatDate(State.currentDate);
-  document.getElementById('headerSub').textContent = isToday ? formatDateFull(State.currentDate) : '';
 
-  // 공휴일·기념일 알림
-  const notice = document.getElementById('dateNotice');
-  if (notice) notice.innerHTML = buildDateNoticeHTML(State.currentDate);
+  // 날짜 포맷 — 연도 포함 한 줄
+  const dd = parseDate(State.currentDate);
+  const dateWithYear = `${dd.getMonth()+1}월 ${dd.getDate()}일 (${DOW[dd.getDay()]}) · ${dd.getFullYear()}`;
+  document.getElementById('dateDisplay').textContent = dateWithYear;
 
-  // 날짜 네비 중앙 태그 (눈에 잘 띄는 pill)
-  const tagsEl = document.getElementById('dateNoticeTags');
-  if (tagsEl) {
-    const holidays = getKoreanHolidays(parseInt(State.currentDate));
-    const holidayName = holidays[State.currentDate];
-    const annis = getAnniversariesForDate(State.currentDate);
+  // 두 번째 줄: 공휴일/기념일 있을 때만 표시
+  const holidays = getKoreanHolidays(dd.getFullYear());
+  const holidayName = holidays[State.currentDate];
+  const annis = getAnniversariesForDate(State.currentDate);
+  const subParts = [];
+  if (holidayName) subParts.push(`🇰🇷 ${holidayName}`);
+  annis.forEach(a => subParts.push(`${ANNI_ICONS[a.type]||'📅'} ${a.name}`));
+  document.getElementById('dateSub').textContent = subParts.join(' · ');
+
+  // 최상단 기념일/공휴일 배너
+  const banner = document.getElementById('topAnniBanner');
+  if (banner) {
     let tags = '';
-    if (holidayName) tags += `<span class="notice-tag tag-holiday">🇰🇷 ${holidayName}</span>`;
+    if (holidayName) tags += `<span class="top-anni-tag tag-holiday">🇰🇷 ${holidayName}</span>`;
     annis.forEach(a => {
-      const icon = ANNI_ICONS[a.type] || '📅';
-      tags += `<span class="notice-tag tag-anni">${icon} ${escapeHtml(a.name)}</span>`;
+      tags += `<span class="top-anni-tag">${ANNI_ICONS[a.type]||'📅'} ${escapeHtml(a.name)}</span>`;
     });
-    tagsEl.innerHTML = tags;
+    banner.innerHTML = tags;
   }
+
+  const isToday = State.currentDate === localDate();
+  document.getElementById('headerTitle').textContent = isToday ? '오늘' : `${dd.getMonth()+1}월 ${dd.getDate()}일`;
+  document.getElementById('headerSub').textContent = isToday ? `${dd.getFullYear()}년 ${dd.getMonth()+1}월 ${dd.getDate()}일` : '';
 
   // AI 요약
   renderAiSummary(State.currentDate);
@@ -1787,14 +1822,16 @@ function renderRoutineChecklist() {
         <span>오늘의 루틴 ${doneCount}/${activeItems.length}</span>
         <span class="routine-rate">${rate}% 완료율</span>
       </div>
+      <div class="routine-grid">
       ${activeItems.map(r => {
         const done = doneIds.includes(r.id);
         return `<div class="routine-item${done?' done':''}" onclick="App.checkRoutine('${r.id}','${today}')">
           <div class="routine-check">${done ? '✓' : ''}</div>
-          <span class="routine-name">${escapeHtml(r.name)}</span>
-          <span class="routine-period">${PERIOD_LABEL[r.period] || ''}</span>
+          <span class="routine-name" style="font-size:13px">${escapeHtml(r.name)}</span>
+          <span class="routine-period" style="font-size:10px">${PERIOD_LABEL[r.period] || ''}</span>
         </div>`;
       }).join('')}
+      </div>
     </div>`;
 }
 
