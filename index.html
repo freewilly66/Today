@@ -895,7 +895,7 @@ const PERIOD_LABEL = { morning: '🌅 아침', evening: '🌙 저녁', anytime: 
 
 const S = {
   get: k => { try { const v = localStorage.getItem(PREF+k); return v ? JSON.parse(v) : null; } catch { return null; } },
-  set: (k, v) => { try { localStorage.setItem(PREF+k, JSON.stringify(v)); } catch(e) { console.error('Storage full', e); } },
+  set: (k, v) => { try { localStorage.setItem(PREF+k, JSON.stringify(v)); } catch(e) { console.error('Storage full', e); if (typeof App !== 'undefined') App.toast('저장 공간이 부족합니다. 오래된 데이터를 정리해 주세요.', 4000); } },
   del: k => localStorage.removeItem(PREF+k),
   size: () => {
     let b = 0;
@@ -1048,7 +1048,7 @@ function addRoutineEntry(routineId, date) {
 }
 function removeRoutineEntry(routineId, date) {
   const key = entriesKey(date);
-  const arr = (S.get(key) || []).filter(e => !(e.routineId === routineId && e.date === date));
+  const arr = (S.get(key) || []).filter(e => !(e.routineId === routineId && e.date === date && e.inputMethod === 'routine'));
   S.set(key, arr);
 }
 function getCompletionRate(days = 30) {
@@ -1173,7 +1173,7 @@ function updateStreak(date) {
   s.lastRecordDate = today;
   if (s.current > s.longest) s.longest = s.current;
   // 마일스톤
-  for (const m of [7,30,100]) {
+  for (const m of [7,30,100,200,300,365,400,500,600,700,730,1000]) {
     if (s.current === m && !s.milestones.includes(m)) {
       s.milestones.push(m);
       setTimeout(() => App.toast(`🏆 ${m}일 달성! 대단해요!`), 500);
@@ -1306,7 +1306,7 @@ function renderRoutineChecklist() {
     </div>`;
 }
 
-
+function renderCalendar() {
   const y = State.calYear, m = State.calMonth;
   document.getElementById('calTitle').textContent = `${y}년 ${MONTHS[m]}`;
   const firstDay = new Date(y, m, 1).getDay();
@@ -1796,7 +1796,7 @@ const App = {
     this.toast('루틴 삭제됨');
   },
 
-
+  toast(msg, duration = 2500) {
     const el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
