@@ -1832,6 +1832,7 @@ function renderStreak() {
 function renderRoutineChecklist() {
   const el = document.getElementById('routineChecklist');
   if (!el) return;
+  if (State.currentDate !== localDate()) { el.innerHTML = ''; return; }
   const { items } = loadRoutines();
   const activeItems = items.filter(r => r.active);
   if (!activeItems.length) { el.innerHTML = ''; return; }
