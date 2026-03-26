@@ -647,6 +647,63 @@ select.cat-select:focus { border-color: var(--accent); }
 
 /* Swipe hint */
 .swipe-hint { font-size: 12px; color: var(--text3); text-align: center; margin-top: 8px; }
+
+/* ── 요일 색상 (일=빨강, 토=파랑) ─────────── */
+.cal-dow.dow-sun { color: #E53935; }
+.cal-dow.dow-sat { color: #1976D2; }
+@media (prefers-color-scheme: dark) {
+  .cal-dow.dow-sun { color: #FF5252; }
+  .cal-dow.dow-sat { color: #64B5F6; }
+}
+
+/* ── 공휴일·일요일 = 빨강, 토요일 = 파랑 ── */
+.cal-day.holiday:not(.today):not(.selected) { color: #E53935; font-weight: 700; }
+.cal-day.saturday:not(.today):not(.selected) { color: #1976D2; }
+@media (prefers-color-scheme: dark) {
+  .cal-day.holiday:not(.today):not(.selected) { color: #FF5252; }
+  .cal-day.saturday:not(.today):not(.selected) { color: #64B5F6; }
+}
+
+/* ── 달력 도트 변형 ─────────────────────── */
+.cal-dot.dot-holiday { background: #E53935; }
+.cal-dot.dot-anni    { background: #9C27B0; }
+@media (prefers-color-scheme: dark) {
+  .cal-dot.dot-holiday { background: #FF5252; }
+  .cal-dot.dot-anni    { background: #CE93D8; }
+}
+
+/* ── 날짜 알림 배너 (공휴일 / 기념일) ────── */
+.date-notice { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.holiday-badge {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: 14px;
+  background: rgba(229,57,53,0.08); border: 1px solid rgba(229,57,53,0.18);
+  font-size: 13px; font-weight: 600; color: #E53935;
+}
+.anni-badge {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: 14px;
+  background: rgba(156,39,176,0.08); border: 1px solid rgba(156,39,176,0.18);
+}
+.anni-badge-icon { font-size: 20px; flex-shrink: 0; line-height: 1; }
+.anni-badge-body { flex: 1; }
+.anni-badge-name { font-size: 14px; font-weight: 700; color: var(--text1); }
+.anni-badge-sub  { font-size: 12px; color: var(--text3); margin-top: 1px; }
+@media (prefers-color-scheme: dark) {
+  .holiday-badge { color: #FF5252; background: rgba(255,82,82,0.08); border-color: rgba(255,82,82,0.18); }
+}
+
+/* ── 기념일 설정 행 ────────────────────── */
+.anni-settings-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+}
+.anni-settings-row:last-child { border-bottom: none; }
+.anni-icon { font-size: 22px; flex-shrink: 0; }
+.anni-settings-info { flex: 1; }
+.anni-settings-name { font-size: 15px; font-weight: 500; color: var(--text1); }
+.anni-settings-date { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.anni-settings-btns { display: flex; gap: 6px; }
 </style>
 </head>
 <body>
@@ -693,6 +750,7 @@ select.cat-select:focus { border-color: var(--accent); }
           </div>
         </div>
 
+        <div id="dateNotice"></div>
         <div class="filter-bar" id="filterBar">
           <button class="filter-btn active" data-filter="전체" onclick="App.setFilter(this)">전체</button>
           <button class="filter-btn" data-filter="업무" onclick="App.setFilter(this)">💼 업무</button>
@@ -728,6 +786,13 @@ select.cat-select:focus { border-color: var(--accent); }
           <div class="section-title">루틴 관리</div>
           <div class="settings-card" id="routineSettingsList"></div>
           <button class="submit-btn" style="margin-top:10px;background:var(--accent-light);color:var(--accent);font-size:14px;padding:12px" onclick="App.openAddRoutineModal()">＋ 루틴 추가</button>
+        </div>
+
+        <!-- Anniversaries -->
+        <div class="settings-section">
+          <div class="section-title">가족 기념일</div>
+          <div class="settings-card" id="anniversarySettingsList"></div>
+          <button class="submit-btn" style="margin-top:10px;background:var(--accent-light);color:var(--accent);font-size:14px;padding:12px" onclick="App.openAddAnniModal()">＋ 기념일 추가</button>
         </div>
 
         <!-- API Key -->
@@ -927,6 +992,40 @@ select.cat-select:focus { border-color: var(--accent); }
   </div>
 </div>
 
+<!-- ANNIVERSARY MODAL -->
+<div class="modal-overlay" id="anniModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title" id="anniModalTitle">기념일 추가</div>
+      <button class="modal-close" onclick="App.closeModal('anniModal')">✕</button>
+    </div>
+    <input class="input-area" id="anniNameInput" placeholder="예: 홍길동 생일, 결혼기념일, 아버지 기일..." style="min-height:auto;padding:12px 14px;font-size:16px">
+    <div style="margin-top:12px">
+      <div class="input-label" style="margin-bottom:8px">유형</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="cat-opt selected" data-anni-type="birthday" onclick="App.selectAnniType(this)">🎂 생일</button>
+        <button class="cat-opt" data-anni-type="anniversary" onclick="App.selectAnniType(this)">💍 기념일</button>
+        <button class="cat-opt" data-anni-type="memorial" onclick="App.selectAnniType(this)">🕯 기일</button>
+        <button class="cat-opt" data-anni-type="custom" onclick="App.selectAnniType(this)">📅 기타</button>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div class="input-label" style="margin-bottom:8px">날짜</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="anniMonthInput" class="input-sm" placeholder="월" min="1" max="12" style="width:72px;flex:none;text-align:center">
+        <span style="color:var(--text3);font-weight:600">월</span>
+        <input type="number" id="anniDayInput" class="input-sm" placeholder="일" min="1" max="31" style="width:72px;flex:none;text-align:center">
+        <span style="color:var(--text3);font-weight:600">일</span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);margin-left:auto;flex-shrink:0">
+          <input type="checkbox" id="anniLunarCheck"> 음력
+        </label>
+      </div>
+    </div>
+    <button class="submit-btn" id="anniModalSaveBtn" onclick="App.saveAnniversary()">추가</button>
+  </div>
+</div>
+
 <!-- ROUTINE ADD MODAL -->
 <div class="modal-overlay" id="routineModal">
   <div class="modal">
@@ -991,6 +1090,86 @@ const DEFAULT_KEYWORDS = {
          '청소','빨래','요리','드라이브','콘서트','전시','게임']
 };
 
+// ── 한국 공휴일 ─────────────────────────────
+function getKoreanHolidays(year) {
+  const h = {};
+  const add = (m, d, name) => { h[`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`] = name; };
+  // 양력 고정 공휴일
+  add(1,1,'신정'); add(3,1,'삼일절'); add(5,5,'어린이날');
+  add(6,6,'현충일'); add(8,15,'광복절'); add(10,3,'개천절');
+  add(10,9,'한글날'); add(12,25,'성탄절');
+  // 음력 공휴일 (2024-2032 미리 계산)
+  const lunar = {
+    2024:{ seollal:[[2,9],[2,10],[2,11]], buddha:[[5,15]], chuseok:[[9,16],[9,17],[9,18]] },
+    2025:{ seollal:[[1,28],[1,29],[1,30]], buddha:[[5,5]],  chuseok:[[10,5],[10,6],[10,7]] },
+    2026:{ seollal:[[2,17],[2,18],[2,19]], buddha:[[5,24]], chuseok:[[9,24],[9,25],[9,26]] },
+    2027:{ seollal:[[2,6],[2,7],[2,8]],   buddha:[[5,14]], chuseok:[[10,13],[10,14],[10,15]] },
+    2028:{ seollal:[[1,26],[1,27],[1,28]], buddha:[[5,2]],  chuseok:[[10,1],[10,2],[10,3]] },
+    2029:{ seollal:[[2,13],[2,14],[2,15]], buddha:[[5,21]], chuseok:[[9,20],[9,21],[9,22]] },
+    2030:{ seollal:[[2,2],[2,3],[2,4]],   buddha:[[5,11]], chuseok:[[10,9],[10,10],[10,11]] },
+    2031:{ seollal:[[1,22],[1,23],[1,24]], buddha:[[4,30]], chuseok:[[9,28],[9,29],[9,30]] },
+    2032:{ seollal:[[2,10],[2,11],[2,12]], buddha:[[5,18]], chuseok:[[9,16],[9,17],[9,18]] },
+  };
+  const ly = lunar[year];
+  if (ly) {
+    const [s1,s2,s3] = ly.seollal;
+    add(s1[0],s1[1],'설날 연휴'); add(s2[0],s2[1],'설날'); add(s3[0],s3[1],'설날 연휴');
+    add(ly.buddha[0][0], ly.buddha[0][1], '부처님오신날');
+    const [c1,c2,c3] = ly.chuseok;
+    add(c1[0],c1[1],'추석 연휴'); add(c2[0],c2[1],'추석'); add(c3[0],c3[1],'추석 연휴');
+  }
+  return h;
+}
+
+// ── 기념일 CRUD ─────────────────────────────
+const ANNI_ICONS = { birthday:'🎂', anniversary:'💍', memorial:'🕯', custom:'📅' };
+
+function loadAnniversaries() { return S.get('anniversaries') || []; }
+function saveAnniversaries(list) { S.set('anniversaries', list); }
+
+function getAnniversariesForDate(dateStr) {
+  const [,mm,dd] = dateStr.split('-').map(Number);
+  return loadAnniversaries().filter(a => a.month === mm && a.day === dd);
+}
+
+function renderAnniversarySettings() {
+  const el = document.getElementById('anniversarySettingsList');
+  if (!el) return;
+  const list = loadAnniversaries();
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:14px 16px;font-size:14px;color:var(--text3)">등록된 기념일이 없어요. 아래에서 추가해주세요.</div>';
+    return;
+  }
+  el.innerHTML = list.map(a => `
+    <div class="anni-settings-row">
+      <div class="anni-icon">${ANNI_ICONS[a.type] || '📅'}</div>
+      <div class="anni-settings-info">
+        <div class="anni-settings-name">${escapeHtml(a.name)}</div>
+        <div class="anni-settings-date">${a.month}월 ${a.day}일${a.lunar ? ' (음력)' : ''}</div>
+      </div>
+      <div class="anni-settings-btns">
+        <button class="action-btn" onclick="App.openEditAnniModal('${a.id}')" title="수정">✏️</button>
+        <button class="action-btn danger" onclick="App.deleteAnniversary('${a.id}')" title="삭제">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function buildDateNoticeHTML(dateStr) {
+  const holidays = getKoreanHolidays(parseInt(dateStr));
+  const holidayName = holidays[dateStr];
+  const annis = getAnniversariesForDate(dateStr);
+  const parts = [];
+  if (holidayName) {
+    parts.push(`<div class="holiday-badge">🇰🇷 ${holidayName}</div>`);
+  }
+  annis.forEach(a => {
+    const icon = ANNI_ICONS[a.type] || '📅';
+    const typeLabel = {birthday:'생일',anniversary:'기념일',memorial:'기일',custom:'기념일'}[a.type] || '기념일';
+    parts.push(`<div class="anni-badge"><div class="anni-badge-icon">${icon}</div><div class="anni-badge-body"><div class="anni-badge-name">${escapeHtml(a.name)}</div><div class="anni-badge-sub">${typeLabel}${a.lunar?' (음력)':''}</div></div></div>`);
+  });
+  return parts.length ? `<div class="date-notice">${parts.join('')}</div>` : '';
+}
+
 // 기본 루틴 (코드에 하드코딩)
 const DEFAULT_ROUTINES = [
   { id: 'rt_default_001', name: '아침운동', period: 'morning',  active: true, isDefault: true },
@@ -1048,6 +1227,7 @@ const State = {
   filter: '전체',
   editingId: null,
   editingRoutineId: null,
+  editingAnniId: null,
   manualCat: null,
   weatherCache: null,
 };
@@ -1354,6 +1534,10 @@ function renderTimeline() {
   document.getElementById('headerTitle').textContent = isToday ? '오늘' : formatDate(State.currentDate);
   document.getElementById('headerSub').textContent = isToday ? formatDateFull(State.currentDate) : '';
 
+  // 공휴일·기념일 알림
+  const notice = document.getElementById('dateNotice');
+  if (notice) notice.innerHTML = buildDateNoticeHTML(State.currentDate);
+
   if (!filtered.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">📝</div><div class="empty-text">기록이 없어요</div><div class="empty-sub">아래 + 버튼으로 오늘을 기록해보세요</div></div>`;
     return;
@@ -1430,8 +1614,14 @@ function renderCalendar() {
   const ym = `${y}-${String(m+1).padStart(2,'0')}`;
   const monthEntries = getAllEntriesForMonth(ym);
   const datesWithEntries = new Set(monthEntries.map(e => e.date));
+  const holidays = getKoreanHolidays(y);
+  const anniversaries = loadAnniversaries();
 
-  let html = DOW.map(d => `<div class="cal-dow">${d}</div>`).join('');
+  // 요일 헤더 (일=빨강, 토=파랑)
+  let html = DOW.map((d, i) =>
+    `<div class="cal-dow${i===0?' dow-sun':i===6?' dow-sat':''}">${d}</div>`
+  ).join('');
+
   const prevLast = new Date(y, m, 0).getDate();
   for (let i = 0; i < firstDay; i++) {
     html += `<div class="cal-day other-month">${prevLast - firstDay + i + 1}</div>`;
@@ -1440,9 +1630,25 @@ function renderCalendar() {
     const dateStr = `${ym}-${String(d).padStart(2,'0')}`;
     const isToday = dateStr === today;
     const isSelected = dateStr === State.currentDate;
+    const dow = new Date(y, m, d).getDay();       // 0=일, 6=토
+    const isHoliday = !!holidays[dateStr] || dow === 0; // 공휴일 or 일요일
+    const isSat = dow === 6;
     const hasDot = datesWithEntries.has(dateStr);
-    const cls = [isToday?'today':'', isSelected&&!isToday?'selected':''].filter(Boolean).join(' ');
-    html += `<div class="cal-day ${cls}" onclick="App.selectCalDay('${dateStr}')">${d}${hasDot ? '<div class="cal-dot"></div>' : ''}</div>`;
+    const hasAnni = anniversaries.some(a => a.month === m+1 && a.day === d);
+
+    const cls = [
+      isToday ? 'today' : '',
+      isSelected && !isToday ? 'selected' : '',
+      !isToday && isHoliday ? 'holiday' : '',
+      !isToday && isSat ? 'saturday' : '',
+    ].filter(Boolean).join(' ');
+
+    let dots = '';
+    if (hasDot) dots += `<div class="cal-dot${isHoliday&&!isToday?' dot-holiday':''}"></div>`;
+    if (hasAnni) dots += `<div class="cal-dot dot-anni"></div>`;
+
+    const title = holidays[dateStr] || '';
+    html += `<div class="cal-day ${cls}" onclick="App.selectCalDay('${dateStr}')" title="${title}">${d}${dots}</div>`;
   }
   const remaining = (7 - (firstDay + lastDate) % 7) % 7;
   for (let i = 1; i <= remaining; i++) {
@@ -1454,11 +1660,12 @@ function renderCalendar() {
 function renderCalDayEntries(date) {
   const entries = getEntries(date);
   const el = document.getElementById('calDayEntries');
+  const noticeHTML = buildDateNoticeHTML(date);
   if (!entries.length) {
-    el.innerHTML = `<div class="empty-state" style="padding:30px 20px"><div class="empty-icon">📝</div><div class="empty-text">이 날 기록이 없어요</div></div>`;
+    el.innerHTML = noticeHTML + `<div class="empty-state" style="padding:30px 20px"><div class="empty-icon">📝</div><div class="empty-text">이 날 기록이 없어요</div></div>`;
     return;
   }
-  el.innerHTML = `<div class="section-title" style="margin-bottom:10px">${formatDate(date)}</div><div class="timeline">${entries.map(entryHTML).join('')}</div>`;
+  el.innerHTML = noticeHTML + `<div class="section-title" style="margin-bottom:10px">${formatDate(date)}</div><div class="timeline">${entries.map(entryHTML).join('')}</div>`;
 }
 
 function renderKeywords() {
@@ -1494,6 +1701,7 @@ function renderSettings() {
   document.getElementById('totalEntries').textContent = `${total}개`;
   document.getElementById('storageSize').textContent = `${Math.round(S.size() / 1024)} KB`;
   renderKeywords();
+  renderAnniversarySettings();
 }
 
 function renderRoutineSettings() {
@@ -1847,6 +2055,77 @@ const App = {
     renderTimeline();
     renderStreak();
     this.toast(isDone ? '✅ 완료!' : '체크 해제됨');
+  },
+
+  // ── 기념일 ───────────────────────────────
+  openAddAnniModal() {
+    State.editingAnniId = null;
+    document.getElementById('anniModalTitle').textContent = '기념일 추가';
+    document.getElementById('anniModalSaveBtn').textContent = '추가';
+    document.getElementById('anniNameInput').value = '';
+    document.getElementById('anniMonthInput').value = '';
+    document.getElementById('anniDayInput').value = '';
+    document.getElementById('anniLunarCheck').checked = false;
+    document.querySelectorAll('[data-anni-type]').forEach(b => b.classList.toggle('selected', b.dataset.anniType === 'birthday'));
+    this.openModal('anniModal');
+    setTimeout(() => document.getElementById('anniNameInput').focus(), 400);
+  },
+
+  openEditAnniModal(id) {
+    const list = loadAnniversaries();
+    const a = list.find(x => x.id === id);
+    if (!a) return;
+    State.editingAnniId = id;
+    document.getElementById('anniModalTitle').textContent = '기념일 수정';
+    document.getElementById('anniModalSaveBtn').textContent = '저장';
+    document.getElementById('anniNameInput').value = a.name;
+    document.getElementById('anniMonthInput').value = a.month;
+    document.getElementById('anniDayInput').value = a.day;
+    document.getElementById('anniLunarCheck').checked = !!a.lunar;
+    document.querySelectorAll('[data-anni-type]').forEach(b => b.classList.toggle('selected', b.dataset.anniType === a.type));
+    this.openModal('anniModal');
+    setTimeout(() => document.getElementById('anniNameInput').focus(), 400);
+  },
+
+  selectAnniType(btn) {
+    document.querySelectorAll('[data-anni-type]').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  },
+
+  saveAnniversary() {
+    const name = document.getElementById('anniNameInput').value.trim();
+    if (!name) { this.toast('이름을 입력해주세요'); return; }
+    const month = parseInt(document.getElementById('anniMonthInput').value);
+    const day   = parseInt(document.getElementById('anniDayInput').value);
+    if (!month || month < 1 || month > 12) { this.toast('월을 올바르게 입력해주세요 (1-12)'); return; }
+    if (!day   || day   < 1 || day   > 31) { this.toast('일을 올바르게 입력해주세요 (1-31)'); return; }
+    const typeBtn = document.querySelector('[data-anni-type].selected');
+    const type = typeBtn ? typeBtn.dataset.anniType : 'custom';
+    const lunar = document.getElementById('anniLunarCheck').checked;
+    const list = loadAnniversaries();
+    if (State.editingAnniId) {
+      const idx = list.findIndex(x => x.id === State.editingAnniId);
+      if (idx >= 0) Object.assign(list[idx], { name, month, day, type, lunar });
+      this.toast(`"${name}" 수정됨 ✓`);
+    } else {
+      list.push({ id: `ann_${Date.now()}`, name, month, day, type, lunar });
+      this.toast(`"${name}" 추가됨 ✓`);
+    }
+    saveAnniversaries(list);
+    State.editingAnniId = null;
+    this.closeModal('anniModal');
+    renderAnniversarySettings();
+    renderCalendar();
+  },
+
+  deleteAnniversary(id) {
+    const list = loadAnniversaries();
+    const a = list.find(x => x.id === id);
+    if (!a || !confirm(`"${a.name}"을 삭제할까요?`)) return;
+    saveAnniversaries(list.filter(x => x.id !== id));
+    renderAnniversarySettings();
+    renderCalendar();
+    this.toast('기념일 삭제됨');
   },
 
   openAddRoutineModal() {
