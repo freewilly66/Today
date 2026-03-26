@@ -824,7 +824,7 @@ select.cat-select:focus { border-color: var(--accent); }
   <div class="modal">
     <div class="modal-handle"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="modal-title">루틴 추가</div>
+      <div class="modal-title" id="routineModalTitle">루틴 추가</div>
       <button class="modal-close" onclick="App.closeModal('routineModal')">✕</button>
     </div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:12px">루틴 이름을 입력하고 시간대를 선택하세요.</div>
@@ -837,7 +837,7 @@ select.cat-select:focus { border-color: var(--accent); }
         <button class="cat-opt selected" data-period="anytime" onclick="App.selectPeriod(this)" style="flex:1;text-align:center">⏰ 언제든</button>
       </div>
     </div>
-    <button class="submit-btn" onclick="App.saveRoutine()">추가</button>
+    <button class="submit-btn" id="routineModalSaveBtn" onclick="App.saveRoutine()">추가</button>
   </div>
 </div>
 
@@ -939,6 +939,7 @@ const State = {
   calMonth: new Date().getMonth(),
   filter: '전체',
   editingId: null,
+  editingRoutineId: null,
   manualCat: null,
   weatherCache: null,
 };
@@ -971,21 +972,27 @@ function getKeywords() {
 // ── 루틴 CRUD ────────────────────────────────
 function loadRoutines() {
   const saved = S.get('routines') || {};
-  const customItems = saved.items || [];
+  // 첫 실행 or 구버전 마이그레이션: 기본 루틴을 일반 항목으로 시드
+  if (!saved.routinesSeeded) {
+    if (!saved.items) saved.items = [];
+    const overrides = saved.overrides || {};
+    DEFAULT_ROUTINES.slice().reverse().forEach(r => {
+      if (!saved.items.find(i => i.id === r.id)) {
+        const active = overrides[r.id] !== undefined ? overrides[r.id].active : r.active;
+        saved.items.unshift({ id: r.id, name: r.name, period: r.period, active });
+      }
+    });
+    delete saved.overrides;
+    saved.routinesSeeded = true;
+    S.set('routines', saved);
+  }
+  const items = saved.items || [];
   const completions = saved.completions || {};
-  const overrides = saved.overrides || {};
-  // 기본 루틴에 오버라이드 적용
-  const defaults = DEFAULT_ROUTINES.map(r => ({
-    ...r,
-    active: overrides[r.id] !== undefined ? overrides[r.id].active : r.active
-  }));
-  const allItems = [...defaults, ...customItems];
-  return { items: allItems, completions };
+  return { items, completions };
 }
 function saveRoutineItems(items) {
-  // 커스텀 루틴만 저장 (기본 루틴은 코드에)
   const saved = S.get('routines') || {};
-  saved.items = items.filter(r => !r.isDefault);
+  saved.items = items;
   S.set('routines', saved);
 }
 function saveRoutineCompletions(completions) {
@@ -1401,7 +1408,8 @@ function renderRoutineSettings() {
           <input type="checkbox" ${r.active ? 'checked' : ''} onchange="App.toggleRoutineActive('${r.id}', this.checked)">
           <span class="toggle-slider"></span>
         </label>
-        ${!r.isDefault ? `<button class="action-btn danger" onclick="App.deleteRoutine('${r.id}')" title="삭제">🗑</button>` : ''}
+        <button class="action-btn" onclick="App.openEditRoutineModal('${r.id}')" title="수정">✏️</button>
+        <button class="action-btn danger" onclick="App.deleteRoutine('${r.id}')" title="삭제">🗑</button>
       </div>
     </div>`).join('');
 }
@@ -1734,9 +1742,27 @@ const App = {
   },
 
   openAddRoutineModal() {
+    State.editingRoutineId = null;
+    document.getElementById('routineModalTitle').textContent = '루틴 추가';
+    document.getElementById('routineModalSaveBtn').textContent = '추가';
     document.getElementById('routineNameInput').value = '';
     document.querySelectorAll('[data-period]').forEach(b => {
       b.classList.toggle('selected', b.dataset.period === 'anytime');
+    });
+    this.openModal('routineModal');
+    setTimeout(() => document.getElementById('routineNameInput').focus(), 400);
+  },
+
+  openEditRoutineModal(routineId) {
+    const { items } = loadRoutines();
+    const r = items.find(i => i.id === routineId);
+    if (!r) return;
+    State.editingRoutineId = routineId;
+    document.getElementById('routineModalTitle').textContent = '루틴 수정';
+    document.getElementById('routineModalSaveBtn').textContent = '저장';
+    document.getElementById('routineNameInput').value = r.name;
+    document.querySelectorAll('[data-period]').forEach(b => {
+      b.classList.toggle('selected', b.dataset.period === r.period);
     });
     this.openModal('routineModal');
     setTimeout(() => document.getElementById('routineNameInput').focus(), 400);
@@ -1754,32 +1780,38 @@ const App = {
     const period = periodBtn ? periodBtn.dataset.period : 'anytime';
     const saved = S.get('routines') || { items: [], completions: {} };
     if (!saved.items) saved.items = [];
-    // 중복 이름 체크
     const { items } = loadRoutines();
-    if (items.find(r => r.name === name)) {
-      this.toast('같은 이름의 루틴이 이미 있어요'); return;
+
+    if (State.editingRoutineId) {
+      // 수정 모드 — 자기 자신 제외 중복 이름 체크
+      if (items.find(r => r.name === name && r.id !== State.editingRoutineId)) {
+        this.toast('같은 이름의 루틴이 이미 있어요'); return;
+      }
+      const idx = saved.items.findIndex(r => r.id === State.editingRoutineId);
+      if (idx >= 0) { saved.items[idx].name = name; saved.items[idx].period = period; }
+      S.set('routines', saved);
+      this.closeModal('routineModal');
+      this.toast(`"${name}" 루틴 수정됨 ✓`);
+      State.editingRoutineId = null;
+    } else {
+      // 추가 모드
+      if (items.find(r => r.name === name)) {
+        this.toast('같은 이름의 루틴이 이미 있어요'); return;
+      }
+      saved.items.push({ id: `rt_custom_${Date.now()}`, name, period, active: true });
+      S.set('routines', saved);
+      this.closeModal('routineModal');
+      this.toast(`"${name}" 루틴 추가됨 ✓`);
     }
-    saved.items.push({
-      id: `rt_custom_${Date.now()}`,
-      name, period, active: true, isDefault: false
-    });
-    S.set('routines', saved);
-    this.closeModal('routineModal');
-    this.toast(`"${name}" 루틴 추가됨 ✓`);
     renderRoutineSettings();
     renderRoutineChecklist();
   },
 
   toggleRoutineActive(routineId, active) {
     const saved = S.get('routines') || { items: [], completions: {} };
-    // 기본 루틴 비활성화: 별도 overrides 저장
-    if (!saved.overrides) saved.overrides = {};
-    saved.overrides[routineId] = { active };
-    // 커스텀 루틴은 items에서 직접 수정
-    if (saved.items) {
-      const idx = saved.items.findIndex(r => r.id === routineId);
-      if (idx >= 0) saved.items[idx].active = active;
-    }
+    if (!saved.items) saved.items = [];
+    const idx = saved.items.findIndex(r => r.id === routineId);
+    if (idx >= 0) saved.items[idx].active = active;
     S.set('routines', saved);
     renderRoutineSettings();
     renderRoutineChecklist();
