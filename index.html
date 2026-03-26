@@ -313,6 +313,24 @@ body::before {
 .date-nav-center { text-align: center; }
 .date-display { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
 .date-dow { font-size: 12px; color: var(--text3); margin-top: 1px; }
+#dateNoticeTags { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-top: 7px; }
+.notice-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.notice-tag.tag-holiday {
+  background: rgba(229,57,53,0.12); border: 1px solid rgba(229,57,53,0.30);
+  color: #C62828;
+}
+.notice-tag.tag-anni {
+  background: rgba(156,39,176,0.12); border: 1px solid rgba(156,39,176,0.30);
+  color: #7B1FA2;
+}
+@media (prefers-color-scheme: dark) {
+  .notice-tag.tag-holiday { background: rgba(229,57,53,0.18); border-color: rgba(229,57,53,0.40); color: #EF9A9A; }
+  .notice-tag.tag-anni    { background: rgba(156,39,176,0.20); border-color: rgba(156,39,176,0.40); color: #CE93D8; }
+}
 .today-btn {
   font-size: 12px; padding: 5px 12px;
   background: var(--accent-light); color: var(--accent);
@@ -673,24 +691,33 @@ select.cat-select:focus { border-color: var(--accent); }
 }
 
 /* ── 날짜 알림 배너 (공휴일 / 기념일) ────── */
-.date-notice { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.date-notice {
+  display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;
+}
 .holiday-badge {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; border-radius: 14px;
-  background: rgba(229,57,53,0.08); border: 1px solid rgba(229,57,53,0.18);
-  font-size: 13px; font-weight: 600; color: #E53935;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 18px; border-radius: 16px; text-align: center;
+  background: linear-gradient(135deg, rgba(229,57,53,0.10), rgba(255,87,34,0.07));
+  border: 1.5px solid rgba(229,57,53,0.28);
+  box-shadow: 0 3px 14px rgba(229,57,53,0.10);
+  font-size: 14px; font-weight: 700; color: #C62828;
 }
 .anni-badge {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px; border-radius: 14px;
-  background: rgba(156,39,176,0.08); border: 1px solid rgba(156,39,176,0.18);
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 14px 20px; border-radius: 18px;
+  background: linear-gradient(135deg, rgba(156,39,176,0.10), rgba(233,30,99,0.07));
+  border: 1.5px solid rgba(156,39,176,0.28);
+  box-shadow: 0 3px 14px rgba(156,39,176,0.12);
+  text-align: center;
 }
-.anni-badge-icon { font-size: 20px; flex-shrink: 0; line-height: 1; }
-.anni-badge-body { flex: 1; }
-.anni-badge-name { font-size: 14px; font-weight: 700; color: var(--text1); }
-.anni-badge-sub  { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.anni-badge-icon { font-size: 28px; flex-shrink: 0; line-height: 1; }
+.anni-badge-body { text-align: left; }
+.anni-badge-name { font-size: 16px; font-weight: 800; color: var(--text1); letter-spacing: -0.3px; }
+.anni-badge-sub  { font-size: 12px; color: #9C27B0; margin-top: 2px; font-weight: 600; }
 @media (prefers-color-scheme: dark) {
-  .holiday-badge { color: #FF5252; background: rgba(255,82,82,0.08); border-color: rgba(255,82,82,0.18); }
+  .holiday-badge { color: #EF9A9A; background: linear-gradient(135deg,rgba(229,57,53,0.15),rgba(255,87,34,0.10)); border-color: rgba(229,57,53,0.35); }
+  .anni-badge { background: linear-gradient(135deg,rgba(156,39,176,0.16),rgba(233,30,99,0.10)); border-color: rgba(156,39,176,0.35); }
+  .anni-badge-sub { color: #CE93D8; }
 }
 
 /* ── 기념일 설정 행 ────────────────────── */
@@ -795,6 +822,7 @@ select.cat-select:focus { border-color: var(--accent); }
           <div class="date-nav-center">
             <div class="date-display" id="dateDisplay"></div>
             <div class="date-dow" id="dateDow"></div>
+            <div id="dateNoticeTags"></div>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             <button class="today-btn" onclick="App.goToday()">오늘</button>
@@ -1684,6 +1712,21 @@ function renderTimeline() {
   // 공휴일·기념일 알림
   const notice = document.getElementById('dateNotice');
   if (notice) notice.innerHTML = buildDateNoticeHTML(State.currentDate);
+
+  // 날짜 네비 중앙 태그 (눈에 잘 띄는 pill)
+  const tagsEl = document.getElementById('dateNoticeTags');
+  if (tagsEl) {
+    const holidays = getKoreanHolidays(parseInt(State.currentDate));
+    const holidayName = holidays[State.currentDate];
+    const annis = getAnniversariesForDate(State.currentDate);
+    let tags = '';
+    if (holidayName) tags += `<span class="notice-tag tag-holiday">🇰🇷 ${holidayName}</span>`;
+    annis.forEach(a => {
+      const icon = ANNI_ICONS[a.type] || '📅';
+      tags += `<span class="notice-tag tag-anni">${icon} ${escapeHtml(a.name)}</span>`;
+    });
+    tagsEl.innerHTML = tags;
+  }
 
   // AI 요약
   renderAiSummary(State.currentDate);
