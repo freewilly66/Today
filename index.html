@@ -704,6 +704,58 @@ select.cat-select:focus { border-color: var(--accent); }
 .anni-settings-name { font-size: 15px; font-weight: 500; color: var(--text1); }
 .anni-settings-date { font-size: 12px; color: var(--text3); margin-top: 1px; }
 .anni-settings-btns { display: flex; gap: 6px; }
+
+/* ── AI 기능 ─────────────────────────────── */
+.ai-summary-btn {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 10px 16px; margin-bottom: 10px;
+  background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.22);
+  border-radius: 14px; color: #4F46E5; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.ai-summary-btn:active { background: rgba(99,102,241,0.16); }
+.ai-summary-card {
+  background: rgba(255,255,255,0.82); border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 18px; padding: 16px 18px; margin-bottom: 12px;
+  box-shadow: 0 4px 20px rgba(99,102,241,0.08), 0 1px 4px rgba(0,0,0,0.04);
+}
+.ai-summary-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ai-summary-title {
+  font-size: 13px; font-weight: 700; color: #4F46E5;
+  display: flex; align-items: center; gap: 5px;
+}
+.ai-summary-refresh {
+  font-size: 11px; color: var(--text3); cursor: pointer;
+  padding: 3px 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: none;
+}
+.ai-summary-text {
+  font-size: 14px; line-height: 1.65; color: var(--text1); white-space: pre-wrap;
+}
+.ai-loading {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text3); font-size: 13px; padding: 8px 0;
+}
+.ai-loading-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #4F46E5; animation: aiPulse 1.2s ease-in-out infinite;
+}
+.ai-loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.ai-loading-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes aiPulse { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+.ai-insight-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 18px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.ai-insight-btn:last-child { border-bottom: none; }
+@media (prefers-color-scheme: dark) {
+  .ai-summary-btn { background: rgba(99,102,241,0.14); border-color: rgba(99,102,241,0.3); color: #818CF8; }
+  .ai-summary-card { background: rgba(30,27,75,0.55); border-color: rgba(99,102,241,0.25); }
+  .ai-summary-title { color: #818CF8; }
+}
 </style>
 </head>
 <body>
@@ -759,6 +811,7 @@ select.cat-select:focus { border-color: var(--accent); }
           <button class="filter-btn" data-filter="기타" onclick="App.setFilter(this)">📌 기타</button>
         </div>
 
+        <div id="aiSummaryArea"></div>
         <div class="timeline" id="timeline"></div>
       </div>
     </div>
@@ -795,13 +848,21 @@ select.cat-select:focus { border-color: var(--accent); }
           <button class="submit-btn" style="margin-top:10px;background:var(--accent-light);color:var(--accent);font-size:14px;padding:12px" onclick="App.openAddAnniModal()">＋ 기념일 추가</button>
         </div>
 
-        <!-- API Key -->
+        <!-- API Key + AI Insights -->
         <div class="settings-section">
           <div class="section-title">Claude AI 설정</div>
           <div class="settings-card">
             <div class="settings-row" onclick="App.openApiKeyModal()">
               <span class="settings-label">API 키</span>
               <span class="settings-value"><span id="apiKeyStatus">미설정</span> <span class="settings-chevron">›</span></span>
+            </div>
+            <div class="ai-insight-btn" onclick="App.requestInsight('weekly')">
+              <span class="settings-label">📊 주간 인사이트</span>
+              <span class="settings-value"><span class="settings-chevron">›</span></span>
+            </div>
+            <div class="ai-insight-btn" onclick="App.requestInsight('monthly')">
+              <span class="settings-label">📈 월간 인사이트</span>
+              <span class="settings-value"><span class="settings-chevron">›</span></span>
             </div>
           </div>
         </div>
@@ -1045,6 +1106,18 @@ select.cat-select:focus { border-color: var(--accent); }
       </div>
     </div>
     <button class="submit-btn" id="routineModalSaveBtn" onclick="App.saveRoutine()">추가</button>
+  </div>
+</div>
+
+<!-- AI INSIGHT MODAL -->
+<div class="modal-overlay" id="aiInsightModal">
+  <div class="modal" style="max-height:80vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title" id="aiInsightTitle">AI 인사이트</div>
+      <button class="modal-close" onclick="App.closeModal('aiInsightModal')">✕</button>
+    </div>
+    <div id="aiInsightContent" style="font-size:14px;line-height:1.7;color:var(--text1);white-space:pre-wrap"></div>
   </div>
 </div>
 
@@ -1471,7 +1544,7 @@ function updateStreak(date) {
   for (const m of [7,30,100,200,300,365,400,500,600,700,730,1000]) {
     if (s.current === m && !s.milestones.includes(m)) {
       s.milestones.push(m);
-      setTimeout(() => App.toast(`🏆 ${m}일 달성! 대단해요!`), 500);
+      setTimeout(() => App.requestMilestoneMessage(m), 600);
     }
   }
   // Freeze 토큰 지급 (7일마다)
@@ -1515,12 +1588,86 @@ async function fetchWeather() {
   } catch { return null; }
 }
 
+// ── Claude AI ────────────────────────────────
+async function callClaude(prompt, maxTokens = 400) {
+  const apiKey = S.get('apiKey');
+  if (!apiKey) throw new Error('API_KEY_MISSING');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+// AI 캐시 키 정리 (최근 7일 + weekly/monthly 만 보관)
+function pruneAiCache() {
+  const keep = new Set();
+  const today = localDate();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    keep.add(PREF + 'ai_summary_' + localDate(d));
+  }
+  keep.add(PREF + 'ai_insight_weekly');
+  keep.add(PREF + 'ai_insight_monthly');
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith(PREF + 'ai_') && !keep.has(key)) {
+      localStorage.removeItem(key);
+    }
+  }
+}
+
 // ── ID 생성 ────────────────────────────────────
 function genId() {
   const now = new Date();
   const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
   const rand = Math.random().toString(36).slice(2,6);
   return `${ts}_${rand}`;
+}
+
+// ── AI 요약 렌더 ──────────────────────────────
+function renderAiSummary(date) {
+  const el = document.getElementById('aiSummaryArea');
+  if (!el) return;
+  const entries = getEntries(date);
+  if (!entries.length) { el.innerHTML = ''; return; }
+  const apiKey = S.get('apiKey');
+  if (!apiKey) {
+    el.innerHTML = `<button class="ai-summary-btn" onclick="App.openApiKeyModal()">✨ AI 요약 사용 (API 키 필요)</button>`;
+    return;
+  }
+  const cacheKey = 'ai_summary_' + date;
+  const cached = S.get(cacheKey);
+  if (cached) {
+    el.innerHTML = aiSummaryCardHTML(cached, date);
+  } else {
+    el.innerHTML = `<button class="ai-summary-btn" onclick="App.requestDailySummary('${date}')">✨ AI로 오늘 요약하기</button>`;
+  }
+}
+
+function aiSummaryCardHTML(text, date) {
+  return `<div class="ai-summary-card">
+    <div class="ai-summary-header">
+      <div class="ai-summary-title">✨ AI 요약</div>
+      <button class="ai-summary-refresh" onclick="App.requestDailySummary('${date}', true)">↻ 새로 요약</button>
+    </div>
+    <div class="ai-summary-text">${escapeHtml(text)}</div>
+  </div>`;
 }
 
 // ── 렌더링 ────────────────────────────────────
@@ -1537,6 +1684,9 @@ function renderTimeline() {
   // 공휴일·기념일 알림
   const notice = document.getElementById('dateNotice');
   if (notice) notice.innerHTML = buildDateNoticeHTML(State.currentDate);
+
+  // AI 요약
+  renderAiSummary(State.currentDate);
 
   if (!filtered.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">📝</div><div class="empty-text">기록이 없어요</div><div class="empty-sub">아래 + 버튼으로 오늘을 기록해보세요</div></div>`;
@@ -2215,6 +2365,89 @@ const App = {
     this.toast('루틴 삭제됨');
   },
 
+  // ── AI 기능 ──────────────────────────────
+  async requestDailySummary(date, forceRefresh = false) {
+    const el = document.getElementById('aiSummaryArea');
+    if (!el) return;
+    const cacheKey = 'ai_summary_' + date;
+    if (!forceRefresh) {
+      const cached = S.get(cacheKey);
+      if (cached) { el.innerHTML = aiSummaryCardHTML(cached, date); return; }
+    }
+    // 로딩 표시
+    el.innerHTML = `<div class="ai-summary-card"><div class="ai-summary-header"><div class="ai-summary-title">✨ AI 요약 중...</div></div><div class="ai-loading"><div class="ai-loading-dot"></div><div class="ai-loading-dot"></div><div class="ai-loading-dot"></div><span>Claude가 하루를 분석하고 있어요</span></div></div>`;
+    try {
+      const entries = getEntries(date);
+      const routineData = loadRoutines();
+      const doneIds = getTodayCompletions(date);
+      const completedRoutines = routineData.items.filter(r => doneIds.includes(r.id)).map(r => r.name);
+      const weather = loadSettings().weather?.cache;
+      const entryLines = entries.map(e => `[${e.time}][${e.category}] ${e.text}`).join('\n');
+      const routineLines = completedRoutines.length ? `완료 루틴: ${completedRoutines.join(', ')}` : '완료된 루틴 없음';
+      const weatherLine = weather ? `날씨: ${weather.condition} ${weather.temp}°C` : '';
+      const prompt = `아래는 ${date} 하루 기록입니다. 한국어로 따뜻하고 간결하게 3-4문장으로 요약해주세요. 잘한 점을 칭찬하고, 패턴이나 특이사항이 있으면 언급해주세요. 요약만 작성하고 다른 말은 하지 마세요.\n\n${entryLines}\n${routineLines}\n${weatherLine}`;
+      const summary = await callClaude(prompt, 350);
+      S.set(cacheKey, summary);
+      pruneAiCache();
+      el.innerHTML = aiSummaryCardHTML(summary, date);
+    } catch (e) {
+      const msg = e.message === 'API_KEY_MISSING' ? 'API 키를 먼저 설정해주세요.' : `오류: ${e.message}`;
+      el.innerHTML = `<div class="ai-summary-card"><div class="ai-summary-title" style="color:var(--danger)">⚠️ 요약 실패</div><div class="ai-summary-text" style="color:var(--text3);font-size:13px;margin-top:8px">${msg}</div><button class="ai-summary-refresh" style="margin-top:10px" onclick="App.requestDailySummary('${date}', true)">↻ 다시 시도</button></div>`;
+    }
+  },
+
+  async requestInsight(type) {
+    const apiKey = S.get('apiKey');
+    if (!apiKey) { this.toast('API 키를 먼저 설정해주세요'); this.openApiKeyModal(); return; }
+    const cacheKey = `ai_insight_${type}`;
+    const cached = S.get(cacheKey);
+    const titleMap = { weekly: '📊 주간 인사이트', monthly: '📈 월간 인사이트' };
+    document.getElementById('aiInsightTitle').textContent = titleMap[type] || 'AI 인사이트';
+    document.getElementById('aiInsightContent').innerHTML = `<div class="ai-loading"><div class="ai-loading-dot"></div><div class="ai-loading-dot"></div><div class="ai-loading-dot"></div><span>분석 중...</span></div>`;
+    this.openModal('aiInsightModal');
+    // 캐시 확인 (1시간 유효)
+    if (cached && cached.ts && Date.now() - cached.ts < 3600000) {
+      document.getElementById('aiInsightContent').textContent = cached.text;
+      return;
+    }
+    try {
+      const today = localDate();
+      let allEntries = [];
+      const days = type === 'weekly' ? 7 : 30;
+      for (let i = 0; i < days; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        allEntries.push(...getEntries(localDate(d)));
+      }
+      if (!allEntries.length) {
+        document.getElementById('aiInsightContent').textContent = '분석할 기록이 없어요. 먼저 일과를 기록해보세요.';
+        return;
+      }
+      const period = type === 'weekly' ? '최근 7일' : '최근 30일';
+      const lines = allEntries.map(e => `[${e.date} ${e.time}][${e.category}] ${e.text}`).join('\n');
+      const prompt = `아래는 ${period} 간의 하루 기록입니다. 한국어로 다음을 분석해주세요:\n1. 주요 활동 패턴\n2. 카테고리별 비중\n3. 잘하고 있는 점\n4. 개선하면 좋을 점\n\n분석 결과만 작성하고, 각 항목은 간결하게 작성해주세요.\n\n${lines}`;
+      const maxTok = type === 'monthly' ? 600 : 450;
+      const result = await callClaude(prompt, maxTok);
+      S.set(cacheKey, { text: result, ts: Date.now() });
+      document.getElementById('aiInsightContent').textContent = result;
+    } catch (e) {
+      const msg = e.message === 'API_KEY_MISSING' ? 'API 키를 먼저 설정해주세요.' : `오류: ${e.message}`;
+      document.getElementById('aiInsightContent').textContent = msg;
+    }
+  },
+
+  async requestMilestoneMessage(days) {
+    const apiKey = S.get('apiKey');
+    if (!apiKey) return; // API 키 없으면 조용히 패스
+    try {
+      const prompt = `연속 ${days}일 일과 기록을 달성했습니다! 짧고 따뜻한 한국어 축하 메시지를 1-2문장으로 작성해주세요. 메시지만 작성하세요.`;
+      const msg = await callClaude(prompt, 120);
+      this.toast(`🏆 ${days}일 달성! ${msg}`, 5000);
+    } catch {
+      this.toast(`🏆 ${days}일 달성! 정말 대단해요!`, 3000);
+    }
+  },
+
   toast(msg, duration = 2500) {
     const el = document.getElementById('toast');
     el.textContent = msg;
@@ -2247,6 +2480,7 @@ document.getElementById('weatherBtn').onclick = async () => {
   loadSettings();
   trimOldEntries();
   checkAutoBackupTrigger();
+  pruneAiCache();
   renderTimeline();
   renderStreak();
   renderRoutineChecklist();
