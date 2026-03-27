@@ -718,6 +718,34 @@ select.cat-select:focus { border-color: var(--accent); }
   .cal-dot.dot-term    { background: #81C784; }
 }
 
+/* ── 검색 모달 ───────────────────────────── */
+.search-input-wrap { position: relative; margin-bottom: 12px; }
+.search-input {
+  width: 100%; padding: 11px 16px 11px 40px; border-radius: 14px;
+  border: 1.5px solid var(--border); background: var(--bg2);
+  font-size: 15px; color: var(--text1); outline: none; box-sizing: border-box;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-icon-inner { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 15px; pointer-events: none; }
+.search-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.search-chip {
+  padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text2); cursor: pointer;
+}
+.search-chip.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.search-result-date { font-size: 11px; font-weight: 700; color: var(--text3); padding: 10px 0 4px; letter-spacing: .04em; }
+.search-count { font-size: 12px; color: var(--text3); margin-bottom: 8px; }
+.search-empty { text-align: center; padding: 40px 20px; color: var(--text3); font-size: 14px; line-height: 1.8; }
+
+/* ── Markdown 내보내기 모달 ─────────────── */
+.md-range-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--border);
+  background: var(--bg2); font-size: 15px; color: var(--text1);
+  cursor: pointer; margin-bottom: 10px; width: 100%; text-align: left;
+}
+.md-range-btn:active { background: var(--accent-light); border-color: var(--accent); }
+
 /* ── 날짜 알림 배너 (공휴일 / 기념일) ────── */
 .date-notice {
   display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;
@@ -822,6 +850,7 @@ select.cat-select:focus { border-color: var(--accent); }
       <div class="header-sub" id="headerSub"></div>
     </div>
     <div class="header-actions">
+      <button class="icon-btn" onclick="App.openSearch()" title="검색">🔍</button>
       <button class="icon-btn" id="weatherBtn" title="날씨">🌤</button>
     </div>
   </div>
@@ -956,6 +985,10 @@ select.cat-select:focus { border-color: var(--accent); }
               <span class="settings-label">📥 JSON 가져오기</span>
               <span class="settings-value"><span class="settings-chevron">›</span></span>
             </div>
+            <div class="settings-row" onclick="App.openMdExport()">
+              <span class="settings-label">📝 Markdown 내보내기</span>
+              <span class="settings-value"><span class="settings-chevron">›</span></span>
+            </div>
             <div class="settings-row" onclick="App.autoBackupSettings()">
               <span class="settings-label">⚙️ 자동 백업 설정</span>
               <span class="settings-value"><span id="autoBackupStatus">꺼짐</span> <span class="settings-chevron">›</span></span>
@@ -1082,6 +1115,54 @@ select.cat-select:focus { border-color: var(--accent); }
     </p>
     <input class="input-area" id="apiKeyInput" placeholder="sk-ant-api03-..." style="min-height:auto;padding:12px 14px" type="password">
     <button class="submit-btn" onclick="App.saveApiKey()">저장</button>
+  </div>
+</div>
+
+<!-- SEARCH MODAL -->
+<div class="modal-overlay" id="searchModal">
+  <div class="modal" style="max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="modal-title">🔍 검색</div>
+      <button class="modal-close" onclick="App.closeModal('searchModal')">✕</button>
+    </div>
+    <div class="search-input-wrap">
+      <span class="search-icon-inner">🔍</span>
+      <input type="search" class="search-input" id="searchInput"
+        placeholder="이번달 업무, 지난주 운동..."
+        oninput="App.onSearchInput(this.value)" autocomplete="off" autocorrect="off">
+    </div>
+    <div class="search-chips">
+      <span class="search-chip" onclick="App.searchChip('이번달')">이번달</span>
+      <span class="search-chip" onclick="App.searchChip('지난주')">지난주</span>
+      <span class="search-chip" onclick="App.searchChip('업무')">💼 업무</span>
+      <span class="search-chip" onclick="App.searchChip('개인')">😊 개인</span>
+      <span class="search-chip" onclick="App.searchChip('루틴')">✅ 루틴</span>
+    </div>
+    <div id="searchResults" style="overflow-y:auto;flex:1;padding-bottom:8px"></div>
+  </div>
+</div>
+
+<!-- MARKDOWN EXPORT MODAL -->
+<div class="modal-overlay" id="mdExportModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title">📝 Markdown 내보내기</div>
+      <button class="modal-close" onclick="App.closeModal('mdExportModal')">✕</button>
+    </div>
+    <button class="md-range-btn" onclick="App.exportMarkdown('today')">
+      <span>📅 오늘 하루</span>
+      <span style="font-size:13px;color:var(--text3)">오늘 기록만</span>
+    </button>
+    <button class="md-range-btn" onclick="App.exportMarkdown('month')">
+      <span>📆 이번 달</span>
+      <span id="mdMonthLabel" style="font-size:13px;color:var(--text3)"></span>
+    </button>
+    <button class="md-range-btn" onclick="App.exportMarkdown('all')">
+      <span>🗂 전체</span>
+      <span style="font-size:13px;color:var(--text3)">모든 기록</span>
+    </button>
   </div>
 </div>
 
@@ -1302,6 +1383,92 @@ function renderAnniversarySettings() {
         <button class="action-btn danger" onclick="App.deleteAnniversary('${a.id}')" title="삭제">🗑</button>
       </div>
     </div>`).join('');
+}
+
+// ── 검색 ───────────────────────────────────────
+function parseSearchQuery(rawQuery) {
+  const q = rawQuery.trim().toLowerCase();
+  let dateRange = null, category = null;
+  let keyword = q;
+  const today = localDate();
+  const todayD = parseDate(today);
+
+  const datePatterns = [
+    [/오늘/, () => ({ from: today, to: today })],
+    [/어제/, () => { const d=new Date(todayD); d.setDate(d.getDate()-1); const s=localDate(d); return {from:s,to:s}; }],
+    [/이번\s*주/, () => {
+      const day=todayD.getDay(), mon=new Date(todayD);
+      mon.setDate(mon.getDate()-(day===0?6:day-1));
+      return { from:localDate(mon), to:today };
+    }],
+    [/지난\s*주/, () => {
+      const day=todayD.getDay(), thisMon=new Date(todayD);
+      thisMon.setDate(thisMon.getDate()-(day===0?6:day-1));
+      const lastMon=new Date(thisMon); lastMon.setDate(lastMon.getDate()-7);
+      const lastSun=new Date(thisMon); lastSun.setDate(lastSun.getDate()-1);
+      return { from:localDate(lastMon), to:localDate(lastSun) };
+    }],
+    [/이번\s*달/, () => {
+      const ym=today.slice(0,7), last=new Date(todayD.getFullYear(),todayD.getMonth()+1,0).getDate();
+      return { from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}` };
+    }],
+    [/지난\s*달/, () => {
+      const d=new Date(todayD); d.setMonth(d.getMonth()-1);
+      const y=d.getFullYear(), m=d.getMonth(), ym=`${y}-${String(m+1).padStart(2,'0')}`;
+      return { from:`${ym}-01`, to:`${ym}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}` };
+    }],
+  ];
+  for (const [pat, fn] of datePatterns) {
+    if (pat.test(q)) { dateRange=fn(); keyword=keyword.replace(pat,'').trim(); break; }
+  }
+  if (!dateRange) {
+    const mMatch = q.match(/(\d{1,2})월/);
+    if (mMatch) {
+      const m=parseInt(mMatch[1]), y=todayD.getFullYear();
+      const ym=`${y}-${String(m).padStart(2,'0')}`;
+      dateRange = { from:`${ym}-01`, to:`${ym}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}` };
+      keyword = keyword.replace(/\d{1,2}월/,'').trim();
+    }
+  }
+  for (const [pat, cat] of [[/업무|직장/,'업무'],[/개인|일상/,'개인'],[/루틴/,'루틴'],[/기타/,'기타']]) {
+    if (pat.test(keyword)) { category=cat; keyword=keyword.replace(pat,'').trim(); break; }
+  }
+  return { dateRange, category, keyword: keyword.trim() };
+}
+
+function performSearch(rawQuery) {
+  const el = document.getElementById('searchResults');
+  if (!rawQuery.trim()) { el.innerHTML=''; return; }
+
+  const { dateRange, category, keyword } = parseSearchQuery(rawQuery);
+  let entries = [];
+
+  for (const key of Object.keys(localStorage)) {
+    if (!key.startsWith(PREF + 'entries_')) continue;
+    const ym = key.replace(PREF + 'entries_', '');
+    if (dateRange && (ym < dateRange.from.slice(0,7) || ym > dateRange.to.slice(0,7))) continue;
+    try { const arr = JSON.parse(localStorage[key]); if (Array.isArray(arr)) entries.push(...arr); } catch {}
+  }
+  if (dateRange) entries = entries.filter(e => e.date >= dateRange.from && e.date <= dateRange.to);
+  if (category) entries = entries.filter(e => e.category === category);
+  if (keyword) entries = entries.filter(e => e.text.toLowerCase().includes(keyword));
+
+  entries.sort((a,b) => b.date.localeCompare(a.date) || a.time.localeCompare(b.time));
+
+  if (!entries.length) {
+    el.innerHTML = `<div class="search-empty">검색 결과가 없어요<br><span style="font-size:12px;margin-top:4px;display:block">다른 키워드를 입력해보세요</span></div>`;
+    return;
+  }
+  const byDate = {};
+  entries.forEach(e => { if (!byDate[e.date]) byDate[e.date]=[]; byDate[e.date].push(e); });
+  const DOW_KR = ['일','월','화','수','목','금','토'];
+  let html = `<div class="search-count">${entries.length}개 결과</div>`;
+  for (const date of Object.keys(byDate).sort().reverse()) {
+    const d = parseDate(date);
+    html += `<div class="search-result-date">${d.getMonth()+1}월 ${d.getDate()}일 (${DOW_KR[d.getDay()]})</div>`;
+    byDate[date].forEach(e => { html += entryHTML(e); });
+  }
+  el.innerHTML = html;
 }
 
 function buildDateNoticeHTML(dateStr) {
@@ -2262,6 +2429,102 @@ const App = {
     renderSettings();
     this.toast('📦 JSON 내보내기 완료');
   },
+
+  // Markdown 내보내기
+  openMdExport() {
+    const today = localDate();
+    const d = parseDate(today);
+    document.getElementById('mdMonthLabel').textContent = `${d.getFullYear()}년 ${d.getMonth()+1}월`;
+    this.openModal('mdExportModal');
+  },
+  exportMarkdown(range) {
+    const today = localDate();
+    let entries = [], filename = '';
+    if (range === 'today') {
+      entries = getEntries(today);
+      filename = `daylog_${today}.md`;
+    } else if (range === 'month') {
+      const ym = today.slice(0,7);
+      entries = getAllEntriesForMonth(ym);
+      filename = `daylog_${ym}.md`;
+    } else {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith(PREF + 'entries_')) {
+          try { const arr = JSON.parse(localStorage[key]); if (Array.isArray(arr)) entries.push(...arr); } catch {}
+        }
+      }
+      filename = `daylog_all_${today}.md`;
+    }
+    if (!entries.length) { this.toast('내보낼 기록이 없어요'); return; }
+
+    const byDate = {};
+    entries.forEach(e => { if (!byDate[e.date]) byDate[e.date] = []; byDate[e.date].push(e); });
+    const DOW_KR = ['일','월','화','수','목','금','토'];
+    const CAT_ICON = { 업무:'💼', 개인:'😊', 루틴:'✅', 기타:'📌' };
+
+    let md = `# DayLog 내보내기\n> 내보낸 날짜: ${today}\n\n---\n\n`;
+    for (const date of Object.keys(byDate).sort()) {
+      const d = parseDate(date);
+      const holidays = getKoreanHolidays(d.getFullYear());
+      const specials = [];
+      if (holidays[date]) specials.push(`🇰🇷 ${holidays[date]}`);
+      const st = getSolarTerm(date); if (st) specials.push(`🌿 ${st}`);
+      getAnniversariesForDate(date).forEach(a => specials.push(`${ANNI_ICONS[a.type]||'📅'} ${a.name}`));
+
+      md += `## ${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${DOW_KR[d.getDay()]})\n`;
+      if (specials.length) md += `> ${specials.join(' · ')}\n`;
+      const we = byDate[date].find(e => e.weather);
+      if (we) md += `> ${we.weather.icon} ${we.weather.temp}°C\n`;
+      md += '\n';
+
+      const cats = { 업무:[], 개인:[], 루틴:[], 기타:[] };
+      byDate[date].forEach(e => { (cats[e.category] || cats['기타']).push(e); });
+      for (const [cat, list] of Object.entries(cats)) {
+        if (!list.length) continue;
+        md += `### ${CAT_ICON[cat]} ${cat}\n`;
+        list.forEach(e => {
+          const tags = e.tags && e.tags.length ? ' ' + e.tags.map(t => `#${t}`).join(' ') : '';
+          md += `- **${e.time}** ${e.text}${tags}\n`;
+        });
+        md += '\n';
+      }
+      md += '---\n\n';
+    }
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    this.closeModal('mdExportModal');
+    this.toast('📝 Markdown 내보내기 완료');
+  },
+
+  // 검색
+  openSearch() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchResults').innerHTML = '';
+    document.querySelectorAll('.search-chip').forEach(c => c.classList.remove('active'));
+    this.openModal('searchModal');
+    setTimeout(() => document.getElementById('searchInput').focus(), 200);
+  },
+  _searchTimer: null,
+  onSearchInput(val) {
+    clearTimeout(this._searchTimer);
+    this._searchTimer = setTimeout(() => performSearch(val), 300);
+  },
+  searchChip(term) {
+    const input = document.getElementById('searchInput');
+    const existing = input.value.trim();
+    // 같은 칩 다시 누르면 제거, 아니면 추가
+    if (existing.includes(term)) {
+      input.value = existing.replace(term, '').trim();
+    } else {
+      input.value = existing ? `${existing} ${term}` : term;
+    }
+    document.querySelectorAll('.search-chip').forEach(c => {
+      c.classList.toggle('active', input.value.includes(c.textContent.replace(/[💼😊✅]/,'').trim()));
+    });
+    performSearch(input.value);
+  },
+
   importJSON() {
     document.getElementById('importFileInput').click();
   },
