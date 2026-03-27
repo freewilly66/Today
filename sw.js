@@ -1,4 +1,4 @@
-const CACHE = 'daylog-v2';
+const CACHE = 'daylog-v4';
 const BASE = '/Today';
 const ASSETS = [
   BASE + '/',
