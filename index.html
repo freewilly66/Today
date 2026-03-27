@@ -860,11 +860,7 @@ select.cat-select:focus { border-color: var(--accent); }
     <!-- TIMELINE PAGE -->
     <div class="page active" id="pageTimeline">
       <div class="page-content">
-        <!-- 최상단 기념일/공휴일 배너 -->
-        <div id="topAnniBanner"></div>
-
-        <!-- 루틴 체크리스트 -->
-        <div id="routineChecklist" style="margin-bottom:14px"></div>
+        <!-- 루틴 체크리스트는 dateNav 아래로 이동 -->
 
         <div class="streak-banner" id="streakBanner">
           <div>
@@ -888,6 +884,9 @@ select.cat-select:focus { border-color: var(--accent); }
             <button class="date-nav-btn" onclick="App.nextDay()">→</button>
           </div>
         </div>
+
+        <!-- 루틴 체크리스트 — dateNav 바로 아래 -->
+        <div id="routineChecklist" style="margin-bottom:14px"></div>
 
         <div class="filter-bar" id="filterBar">
           <button class="filter-btn active" data-filter="전체" onclick="App.setFilter(this)">전체</button>
@@ -1939,20 +1938,16 @@ function renderTimeline() {
   annis.forEach(a => subParts.push(`${ANNI_ICONS[a.type]||'📅'} ${a.name}`));
   document.getElementById('dateSub').textContent = subParts.join(' · ');
 
-  // 최상단 기념일/공휴일 배너
-  const banner = document.getElementById('topAnniBanner');
-  if (banner) {
-    let tags = '';
-    if (holidayName) tags += `<span class="top-anni-tag tag-holiday">🇰🇷 ${holidayName}</span>`;
-    annis.forEach(a => {
-      tags += `<span class="top-anni-tag">${ANNI_ICONS[a.type]||'📅'} ${escapeHtml(a.name)}</span>`;
-    });
-    banner.innerHTML = tags;
-  }
-
   const isToday = State.currentDate === localDate();
   document.getElementById('headerTitle').textContent = isToday ? '오늘' : `${dd.getMonth()+1}월 ${dd.getDate()}일`;
-  document.getElementById('headerSub').textContent = isToday ? `${dd.getFullYear()}년 ${dd.getMonth()+1}월 ${dd.getDate()}일` : '';
+
+  // 헤더 subtitle: 날짜 + 기념일/공휴일/절기 한 줄 표시
+  const headerSubParts = [];
+  if (isToday) headerSubParts.push(`${dd.getFullYear()}년 ${dd.getMonth()+1}월 ${dd.getDate()}일`);
+  if (holidayName) headerSubParts.push(`🇰🇷 ${holidayName}`);
+  if (solarTerm) headerSubParts.push(`🌿 ${solarTerm}`);
+  annis.forEach(a => headerSubParts.push(`${ANNI_ICONS[a.type]||'📅'} ${a.name}`));
+  document.getElementById('headerSub').textContent = headerSubParts.join('  ·  ');
 
   // AI 요약
   renderAiSummary(State.currentDate);
@@ -2174,17 +2169,17 @@ const App = {
     const d = parseDate(State.currentDate);
     d.setDate(d.getDate()-1);
     State.currentDate = localDate(d);
-    renderTimeline();
+    renderTimeline(); renderRoutineChecklist();
   },
   nextDay() {
     const d = parseDate(State.currentDate);
     d.setDate(d.getDate()+1);
     State.currentDate = localDate(d);
-    renderTimeline();
+    renderTimeline(); renderRoutineChecklist();
   },
   goToday() {
     State.currentDate = localDate();
-    renderTimeline();
+    renderTimeline(); renderRoutineChecklist();
   },
 
   // 필터
