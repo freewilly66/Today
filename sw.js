@@ -28,6 +28,20 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = e.request.url;
   if (url.includes('api.open-meteo.com') || url.includes('api.anthropic.com')) return;
+
+  // index.html: network-first → git push 즉시 자동 반영, 오프라인 시 캐시 폴백
+  if (url.endsWith('/Today/') || url.endsWith('/Today') || url.endsWith('index.html')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // 나머지 assets: cache-first
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
